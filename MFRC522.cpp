@@ -4,8 +4,13 @@
 * Released into the public domain.
 */
 
+//I2C Pins for Mega2560: SDA(20)->SS
+//						 SCL(21)->MISO
+
 #include <Arduino.h>
-#include <MFRC522.h>
+#include "MFRC522.h"
+#include <SPI.h>
+
 
 /////////////////////////////////////////////////////////////////////////////////////
 // Functions for setting up the Arduino
@@ -46,6 +51,16 @@ void MFRC522::PCD_WriteRegister(	byte reg,		///< The register to write to. One o
 	SPI.endTransaction(); // Stop using the SPI bus
 } // End PCD_WriteRegister()
 
+void MFRC522::PCD_I2C_WriteRegister(byte reg,		///< The register to write to. One of the PCD_Register enums.
+									byte value		///< The value to write.
+	) {
+	Wire.beginTransmission(_chipI2CAddress);		//Initiate write operation
+	Wire.write(reg);								//Write selected register address 
+	Wire.write(value);								//Write data
+	Wire.endTransmission();							//Close communication
+} // End PCD_WriteRegister()
+
+
 /**
  * Writes a number of bytes to the specified register in the MFRC522 chip.
  * The interface is described in the datasheet section 8.1.2.
@@ -64,6 +79,18 @@ void MFRC522::PCD_WriteRegister(	byte reg,		///< The register to write to. One o
 	SPI.endTransaction(); // Stop using the SPI bus
 } // End PCD_WriteRegister()
 
+void MFRC522::PCD_I2C_WriteRegister(byte reg,		///< The register to write to. One of the PCD_Register enums.
+									byte count,		///< The number of bytes to write to the register
+									byte *values	///< The values to write. Byte array.
+	) {
+	Wire.beginTransmission(_chipI2CAddress);		//Initiate write operation
+	Wire.write(reg);								//Write selected register address 
+	for (byte index = 0; index < count; index++) {
+		Wire.write(values[index]);					//Write data
+	}
+	Wire.endTransmission();							//Close communication
+} // End PCD_WriteRegister()
+
 /**
  * Reads a byte from the specified register in the MFRC522 chip.
  * The interface is described in the datasheet section 8.1.2.
@@ -80,6 +107,20 @@ byte MFRC522::PCD_ReadRegister(	byte reg	///< The register to read from. One of 
 	return value;
 } // End PCD_ReadRegister()
 
+byte MFRC522::PCD_I2C_ReadRegister(byte reg	// The register to read from. One of the PCD_I2C_Register enums.
+	) {
+	// Workflow described in Datasheet section 8.1.4.7
+	byte value;
+	Wire.beginTransmission(_chipI2CAddress);	//Start the write operation
+	Wire.write(reg);							//Write the address of the register to read
+	Wire.endTransmission();						//Close the write operation
+	Wire.requestFrom(_chipI2CAddress, (byte)1);	//Request a byte from the selected address. 
+	while (Wire.available())
+	{
+		value = Wire.read();					//Read the byte recieved from the bus
+	}
+	return value;
+} // End PCD_I2C_ReadRegister()
 /**
  * Reads a number of bytes from the specified register in the MFRC522 chip.
  * The interface is described in the datasheet section 8.1.2.
@@ -120,6 +161,40 @@ void MFRC522::PCD_ReadRegister(	byte reg,		///< The register to read from. One o
 	digitalWrite(_chipSelectPin, HIGH);			// Release slave again
 	SPI.endTransaction(); // Stop using the SPI bus
 } // End PCD_ReadRegister()
+
+void MFRC522::PCD_I2C_ReadRegister( byte reg,	///< The register to read from. One of the PCD_I2C_Register enums.
+								byte count,		///< The number of bytes to read
+								byte *values,	///< Byte array to store the values in.
+								byte rxAlign	///< Only bit positions rxAlign..7 in values[0] are updated.
+	) {
+	if (count == 0) {
+		return;									//Sanity check
+	}
+	byte value;
+	byte index = 0;
+	Wire.beginTransmission(_chipI2CAddress);	//Start the write operation
+	Wire.write(reg);							//Write the address of the register to read
+	Wire.endTransmission();						//Close the write operation
+	Wire.requestFrom(_chipI2CAddress, count);	//Request bytes from the selected address. 
+	while (index < count && Wire.available())
+	{
+		if (index == 0 && rxAlign)
+		{
+			byte mask = 0;
+			for (byte i = rxAlign; i <= 7; i++)
+				mask |= (1 << i);
+			value = Wire.read();					//Read the byte recieved from the bus
+			// Apply mask to both current value of values[0] and the new data in value.
+			values[0] = (values[index] & ~mask) | (value & mask);
+		}
+		else
+		{
+			values[index] = Wire.read();
+		}
+		index++;
+	}
+}
+// End PCD_I2C_ReadRegister()
 
 /**
  * Sets the bits given in mask in register reg.
@@ -217,6 +292,21 @@ void MFRC522::PCD_Init() {
 	PCD_AntennaOn();						// Enable the antenna driver pins TX1 and TX2 (they were disabled by the reset)
 } // End PCD_Init()
 
+void MFRC522::PCD_I2C_Init(byte address)
+{
+	_chipI2CAddress = address;
+	Wire.begin();
+	pinMode(_resetPowerDownPin, OUTPUT);
+	if (digitalRead(_resetPowerDownPin) == LOW) {	//The MFRC522 chip is in power down mode.
+		digitalWrite(_resetPowerDownPin, HIGH);		// Exit power down mode. This triggers a hard reset.
+		// Section 8.8.2 in the datasheet says the oscillator start-up time is the start up time of the crystal + 37,74�s. Let us be generous: 50ms.
+		delay(50);
+	}
+	else { // Perform a soft reset
+		PCD_I2C_Reset();
+	}
+}
+
 /**
  * Initializes the MFRC522 chip.
  */
@@ -240,6 +330,18 @@ void MFRC522::PCD_Reset() {
 	delay(50);
 	// Wait for the PowerDown bit in CommandReg to be cleared
 	while (PCD_ReadRegister(CommandReg) & (1<<4)) {
+		// PCD still restarting - unlikely after waiting 50ms, but better safe than sorry.
+	}
+} // End PCD_Reset()
+
+void MFRC522::PCD_I2C_Reset() {
+	PCD_I2C_WriteRegister(CommandReg_I2C, PCD_SoftReset);	// Issue the SoftReset command.
+	// The datasheet does not mention how long the SoftRest command takes to complete.
+	// But the MFRC522 might have been in soft power-down mode (triggered by bit 4 of CommandReg) 
+	// Section 8.8.2 in the datasheet says the oscillator start-up time is the start up time of the crystal + 37,74�s. Let us be generous: 50ms.
+	delay(50);
+	// Wait for the PowerDown bit in CommandReg to be cleared
+	while (PCD_I2C_ReadRegister(CommandReg_I2C) & (1 << 4)) {
 		// PCD still restarting - unlikely after waiting 50ms, but better safe than sorry.
 	}
 } // End PCD_Reset()

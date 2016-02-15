@@ -208,6 +208,81 @@ public:
 		// 						  0x3E			// reserved for production tests
 		// 						  0x3F			// reserved for production tests
 	};
+
+
+	enum PCD_I2C_Register {
+		// Page 0: Command and status
+		//						  0x00			// reserved for future use
+		CommandReg_I2C				= 0x01,	// starts and stops command execution
+		ComIEnReg_I2C				= 0x02,	// enable and disable interrupt request control bits
+		DivIEnReg_I2C				= 0x03,	// enable and disable interrupt request control bits
+		ComIrqReg_I2C				= 0x04,	// interrupt request bits
+		DivIrqReg_I2C				= 0x05,	// interrupt request bits
+		ErrorReg_I2C				= 0x06,	// error bits showing the error status of the last command executed 
+		Status1Reg_I2C				= 0x07,	// communication status bits
+		Status2Reg_I2C				= 0x08,	// receiver and transmitter status bits
+		FIFODataReg_I2C				= 0x09,	// input and output of 64 byte FIFO buffer
+		FIFOLevelReg_I2C			= 0x0A,	// number of bytes stored in the FIFO buffer
+		WaterLevelReg_I2C			= 0x0B,	// level for FIFO underflow and overflow warning
+		ControlReg_I2C				= 0x0C,	// miscellaneous control registers
+		BitFramingReg_I2C			= 0x0D,	// adjustments for bit-oriented frames
+		CollReg_I2C					= 0x0E,	// bit position of the first bit-collision detected on the RF interface
+		//						  0x0F			// reserved for future use
+		
+		// Page 1: Command
+		// 						  0x10			// reserved for future use
+		ModeReg_I2C					= 0x11,	// defines general modes for transmitting and receiving 
+		TxModeReg_I2C				= 0x12,	// defines transmission data rate and framing
+		RxModeReg_I2C				= 0x13,	// defines reception data rate and framing
+		TxControlReg_I2C			= 0x14,	// controls the logical behavior of the antenna driver pins TX1 and TX2
+		TxASKReg_I2C				= 0x15,	// controls the setting of the transmission modulation
+		TxSelReg_I2C				= 0x16,	// selects the internal sources for the antenna driver
+		RxSelReg_I2C				= 0x17,	// selects internal receiver settings
+		RxThresholdReg_I2C			= 0x18,	// selects thresholds for the bit decoder
+		DemodReg_I2C				= 0x19,	// defines demodulator settings
+		// 						  0x1A			// reserved for future use
+		// 						  0x1B			// reserved for future use
+		MfTxReg_I2C					= 0x1C,	// controls some MIFARE communication transmit parameters
+		MfRxReg_I2C					= 0x1D,	// controls some MIFARE communication receive parameters
+		// 						  0x1E			// reserved for future use
+		SerialSpeedReg_I2C			= 0x1F,	// selects the speed of the serial UART interface
+		
+		// Page 2: Configuration
+		// 						  0x20			// reserved for future use
+		CRCResultRegH_I2C			= 0x21,	// shows the MSB and LSB values of the CRC calculation
+		CRCResultRegL_I2C			= 0x22,
+		// 						  0x23			// reserved for future use
+		ModWidthReg_I2C				= 0x24,	// controls the ModWidth setting?
+		// 						  0x25			// reserved for future use
+		RFCfgReg_I2C				= 0x26,	// configures the receiver gain
+		GsNReg_I2C					= 0x27,	// selects the conductance of the antenna driver pins TX1 and TX2 for modulation 
+		CWGsPReg_I2C				= 0x28,	// defines the conductance of the p-driver output during periods of no modulation
+		ModGsPReg_I2C				= 0x29,	// defines the conductance of the p-driver output during periods of modulation
+		TModeReg_I2C				= 0x2A,	// defines settings for the internal timer
+		TPrescalerReg_I2C			= 0x2B,	// the lower 8 bits of the TPrescaler value. The 4 high bits are in TModeReg.
+		TReloadRegH_I2C				= 0x2C,	// defines the 16-bit timer reload value
+		TReloadRegL_I2C				= 0x2D,
+		TCounterValueRegH_I2C		= 0x2E,	// shows the 16-bit timer value
+		TCounterValueRegL_I2C		= 0x2F,
+		
+		// Page 3: Test Registers
+		// 						  0x30			// reserved for future use
+		TestSel1Reg_I2C				= 0x31,	// general test signal configuration
+		TestSel2Reg_I2C				= 0x32,	// general test signal configuration
+		TestPinEnReg_I2C			= 0x33,	// enables pin output driver on pins D1 to D7
+		TestPinValueReg_I2C			= 0x34,	// defines the values for D1 to D7 when it is used as an I/O bus
+		TestBusReg_I2C				= 0x35,	// shows the status of the internal test bus
+		AutoTestReg_I2C				= 0x36,	// controls the digital self test
+		VersionReg_I2C				= 0x37,	// shows the software version
+		AnalogTestReg_I2C			= 0x38,	// controls the pins AUX1 and AUX2
+		TestDAC1Reg_I2C				= 0x39,	// defines the test value for TestDAC1
+		TestDAC2Reg_I2C				= 0x3A,	// defines the test value for TestDAC2
+		TestADCReg_I2C				= 0x3B		// shows the value of ADC I and Q channels
+		// 						  0x3C			// reserved for production tests
+		// 						  0x3D			// reserved for production tests
+		// 						  0x3E			// reserved for production tests
+		// 						  0x3F			// reserved for production tests
+	};
 	
 	// MFRC522 commands. Described in chapter 10 of the datasheet.
 	enum PCD_Command {
@@ -329,8 +404,12 @@ public:
 	/////////////////////////////////////////////////////////////////////////////////////
 	void PCD_WriteRegister(byte reg, byte value);
 	void PCD_WriteRegister(byte reg, byte count, byte *values);
+	void PCD_I2C_WriteRegister(byte reg, byte value);
+	void PCD_I2C_WriteRegister(byte reg, byte count, byte *values);
 	byte PCD_ReadRegister(byte reg);
+	byte PCD_I2C_ReadRegister(byte reg);
 	void PCD_ReadRegister(byte reg, byte count, byte *values, byte rxAlign = 0);
+	void PCD_I2C_ReadRegister(byte reg, byte count, byte *values, byte rxAlign = 0);
 	void setBitMask(unsigned char reg, unsigned char mask);
 	void PCD_SetRegisterBitMask(byte reg, byte mask);
 	void PCD_ClearRegisterBitMask(byte reg, byte mask);
@@ -340,8 +419,11 @@ public:
 	// Functions for manipulating the MFRC522
 	/////////////////////////////////////////////////////////////////////////////////////
 	void PCD_Init();
+	void PCD_I2C_Init();
+	void PCD_I2C_Init(byte chipI2CAddress);
 	void PCD_Init(byte chipSelectPin, byte resetPowerDownPin);
 	void PCD_Reset();
+	void PCD_I2C_Reset();
 	void PCD_AntennaOn();
 	void PCD_AntennaOff();
 	byte PCD_GetAntennaGain();
@@ -404,7 +486,8 @@ public:
 	
 private:
 	byte _chipSelectPin;		// Arduino pin connected to MFRC522's SPI slave select input (Pin 24, NSS, active low)
-	byte _resetPowerDownPin;	// Arduino pin connected to MFRC522's reset and power down input (Pin 6, NRSTPD, active low)
+	byte _resetPowerDownPin;	// Arduino pin connected to MFRC522's reset and power down input (Pin 6, NRSTPD, active low
+	byte _chipI2CAddress;		// MFRC522's I2C bus address
 	StatusCode MIFARE_TwoStepHelper(byte command, byte blockAddr, long data);
 };
 
