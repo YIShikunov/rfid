@@ -43,19 +43,26 @@ MFRC522::MFRC522(	byte chipSelectPin,		///< Arduino pin connected to MFRC522's S
 void MFRC522::PCD_WriteRegister(	byte reg,		///< The register to write to. One of the PCD_Register enums.
 									byte value		///< The value to write.
 								) {
-	SPI.beginTransaction(SPISettings(SPI_CLOCK_DIV4, MSBFIRST, SPI_MODE0));	// Set the settings to work with SPI bus
-	digitalWrite(_chipSelectPin, LOW);		// Select slave
-	SPI.transfer(reg & 0x7E);				// MSB == 0 is for writing. LSB is not used in address. Datasheet section 8.1.2.3.
-	SPI.transfer(value);
-	digitalWrite(_chipSelectPin, HIGH);		// Release slave again
-	SPI.endTransaction(); // Stop using the SPI bus
+	if (!isUsingI2C)
+	{
+		SPI.beginTransaction(SPISettings(SPI_CLOCK_DIV4, MSBFIRST, SPI_MODE0));	// Set the settings to work with SPI bus
+		digitalWrite(_chipSelectPin, LOW);		// Select slave
+		SPI.transfer(reg & 0x7E);				// MSB == 0 is for writing. LSB is not used in address. Datasheet section 8.1.2.3.
+		SPI.transfer(value);
+		digitalWrite(_chipSelectPin, HIGH);		// Release slave again
+		SPI.endTransaction(); // Stop using the SPI bus
+	}
+	else
+	{
+		PCD_I2C_WriteRegister(reg, value);
+	}
 } // End PCD_WriteRegister()
 
 void MFRC522::PCD_I2C_WriteRegister(byte reg,		///< The register to write to. One of the PCD_Register enums.
 									byte value		///< The value to write.
 	) {
 	Wire.beginTransmission(_chipI2CAddress);		//Initiate write operation
-	Wire.write(reg);								//Write selected register address 
+	Wire.write(reg >> 1);								//Write selected register address 
 	Wire.write(value);								//Write data
 	Wire.endTransmission();							//Close communication
 } // End PCD_WriteRegister()
@@ -69,14 +76,21 @@ void MFRC522::PCD_WriteRegister(	byte reg,		///< The register to write to. One o
 									byte count,		///< The number of bytes to write to the register
 									byte *values	///< The values to write. Byte array.
 								) {
-	SPI.beginTransaction(SPISettings(SPI_CLOCK_DIV4, MSBFIRST, SPI_MODE0));	// Set the settings to work with SPI bus
-	digitalWrite(_chipSelectPin, LOW);		// Select slave
-	SPI.transfer(reg & 0x7E);				// MSB == 0 is for writing. LSB is not used in address. Datasheet section 8.1.2.3.
-	for (byte index = 0; index < count; index++) {
-		SPI.transfer(values[index]);
+	if (!isUsingI2C)
+	{
+		SPI.beginTransaction(SPISettings(SPI_CLOCK_DIV4, MSBFIRST, SPI_MODE0));	// Set the settings to work with SPI bus
+		digitalWrite(_chipSelectPin, LOW);		// Select slave
+		SPI.transfer(reg & 0x7E);				// MSB == 0 is for writing. LSB is not used in address. Datasheet section 8.1.2.3.
+		for (byte index = 0; index < count; index++) {
+			SPI.transfer(values[index]);
+		}
+		digitalWrite(_chipSelectPin, HIGH);		// Release slave again
+		SPI.endTransaction(); // Stop using the SPI bus
 	}
-	digitalWrite(_chipSelectPin, HIGH);		// Release slave again
-	SPI.endTransaction(); // Stop using the SPI bus
+	else
+	{
+		PCD_I2C_WriteRegister(reg, count, values);
+	}
 } // End PCD_WriteRegister()
 
 void MFRC522::PCD_I2C_WriteRegister(byte reg,		///< The register to write to. One of the PCD_Register enums.
@@ -84,7 +98,7 @@ void MFRC522::PCD_I2C_WriteRegister(byte reg,		///< The register to write to. On
 									byte *values	///< The values to write. Byte array.
 	) {
 	Wire.beginTransmission(_chipI2CAddress);		//Initiate write operation
-	Wire.write(reg);								//Write selected register address 
+	Wire.write(reg >> 1);								//Write selected register address 
 	for (byte index = 0; index < count; index++) {
 		Wire.write(values[index]);					//Write data
 	}
@@ -97,14 +111,21 @@ void MFRC522::PCD_I2C_WriteRegister(byte reg,		///< The register to write to. On
  */
 byte MFRC522::PCD_ReadRegister(	byte reg	///< The register to read from. One of the PCD_Register enums.
 								) {
-	byte value;
-	SPI.beginTransaction(SPISettings(SPI_CLOCK_DIV4, MSBFIRST, SPI_MODE0));	// Set the settings to work with SPI bus
-	digitalWrite(_chipSelectPin, LOW);			// Select slave
-	SPI.transfer(0x80 | (reg & 0x7E));			// MSB == 1 is for reading. LSB is not used in address. Datasheet section 8.1.2.3.
-	value = SPI.transfer(0);					// Read the value back. Send 0 to stop reading.
-	digitalWrite(_chipSelectPin, HIGH);			// Release slave again
-	SPI.endTransaction(); // Stop using the SPI bus
-	return value;
+	if (!isUsingI2C)
+	{
+		byte value;
+		SPI.beginTransaction(SPISettings(SPI_CLOCK_DIV4, MSBFIRST, SPI_MODE0));	// Set the settings to work with SPI bus
+		digitalWrite(_chipSelectPin, LOW);			// Select slave
+		SPI.transfer(0x80 | (reg & 0x7E));			// MSB == 1 is for reading. LSB is not used in address. Datasheet section 8.1.2.3.
+		value = SPI.transfer(0);					// Read the value back. Send 0 to stop reading.
+		digitalWrite(_chipSelectPin, HIGH);			// Release slave again
+		SPI.endTransaction(); // Stop using the SPI bus
+		return value;
+	}
+	else
+	{
+		PCD_I2C_ReadRegister(reg);
+	}
 } // End PCD_ReadRegister()
 
 byte MFRC522::PCD_I2C_ReadRegister(byte reg	// The register to read from. One of the PCD_I2C_Register enums.
@@ -112,7 +133,7 @@ byte MFRC522::PCD_I2C_ReadRegister(byte reg	// The register to read from. One of
 	// Workflow described in Datasheet section 8.1.4.7
 	byte value;
 	Wire.beginTransmission(_chipI2CAddress);	//Start the write operation
-	Wire.write(reg);							//Write the address of the register to read
+	Wire.write(reg >> 1);							//Write the address of the register to read
 	Wire.endTransmission();						//Close the write operation
 	Wire.requestFrom(_chipI2CAddress, (byte)1);	//Request a byte from the selected address. 
 	while (Wire.available())
@@ -130,36 +151,43 @@ void MFRC522::PCD_ReadRegister(	byte reg,		///< The register to read from. One o
 								byte *values,	///< Byte array to store the values in.
 								byte rxAlign	///< Only bit positions rxAlign..7 in values[0] are updated.
 								) {
-	if (count == 0) {
-		return;
-	}
-	//Serial.print(F("Reading ")); 	Serial.print(count); Serial.println(F(" bytes from register."));
-	byte address = 0x80 | (reg & 0x7E);		// MSB == 1 is for reading. LSB is not used in address. Datasheet section 8.1.2.3.
-	byte index = 0;							// Index in values array.
-	SPI.beginTransaction(SPISettings(SPI_CLOCK_DIV4, MSBFIRST, SPI_MODE0));	// Set the settings to work with SPI bus
-	digitalWrite(_chipSelectPin, LOW);		// Select slave
-	count--;								// One read is performed outside of the loop
-	SPI.transfer(address);					// Tell MFRC522 which address we want to read
-	while (index < count) {
-		if (index == 0 && rxAlign) {		// Only update bit positions rxAlign..7 in values[0]
-			// Create bit mask for bit positions rxAlign..7
-			byte mask = 0;
-			for (byte i = rxAlign; i <= 7; i++) {
-				mask |= (1 << i);
+	if (!isUsingI2C)
+	{
+		if (count == 0) {
+			return;
+		}
+		//Serial.print(F("Reading ")); 	Serial.print(count); Serial.println(F(" bytes from register."));
+		byte address = 0x80 | (reg & 0x7E);		// MSB == 1 is for reading. LSB is not used in address. Datasheet section 8.1.2.3.
+		byte index = 0;							// Index in values array.
+		SPI.beginTransaction(SPISettings(SPI_CLOCK_DIV4, MSBFIRST, SPI_MODE0));	// Set the settings to work with SPI bus
+		digitalWrite(_chipSelectPin, LOW);		// Select slave
+		count--;								// One read is performed outside of the loop
+		SPI.transfer(address);					// Tell MFRC522 which address we want to read
+		while (index < count) {
+			if (index == 0 && rxAlign) {		// Only update bit positions rxAlign..7 in values[0]
+				// Create bit mask for bit positions rxAlign..7
+				byte mask = 0;
+				for (byte i = rxAlign; i <= 7; i++) {
+					mask |= (1 << i);
+				}
+				// Read value and tell that we want to read the same address again.
+				byte value = SPI.transfer(address);
+				// Apply mask to both current value of values[0] and the new data in value.
+				values[0] = (values[index] & ~mask) | (value & mask);
 			}
-			// Read value and tell that we want to read the same address again.
-			byte value = SPI.transfer(address);
-			// Apply mask to both current value of values[0] and the new data in value.
-			values[0] = (values[index] & ~mask) | (value & mask);
+			else { // Normal case
+				values[index] = SPI.transfer(address);	// Read value and tell that we want to read the same address again.
+			}
+			index++;
 		}
-		else { // Normal case
-			values[index] = SPI.transfer(address);	// Read value and tell that we want to read the same address again.
-		}
-		index++;
+		values[index] = SPI.transfer(0);			// Read the final byte. Send 0 to stop reading.
+		digitalWrite(_chipSelectPin, HIGH);			// Release slave again
+		SPI.endTransaction(); // Stop using the SPI bus
 	}
-	values[index] = SPI.transfer(0);			// Read the final byte. Send 0 to stop reading.
-	digitalWrite(_chipSelectPin, HIGH);			// Release slave again
-	SPI.endTransaction(); // Stop using the SPI bus
+	else
+	{
+		PCD_I2C_ReadRegister(reg, count, values, rxAlign);
+	}
 } // End PCD_ReadRegister()
 
 void MFRC522::PCD_I2C_ReadRegister( byte reg,	///< The register to read from. One of the PCD_I2C_Register enums.
@@ -173,7 +201,7 @@ void MFRC522::PCD_I2C_ReadRegister( byte reg,	///< The register to read from. On
 	byte value;
 	byte index = 0;
 	Wire.beginTransmission(_chipI2CAddress);	//Start the write operation
-	Wire.write(reg);							//Write the address of the register to read
+	Wire.write(reg >> 1);							//Write the address of the register to read
 	Wire.endTransmission();						//Close the write operation
 	Wire.requestFrom(_chipI2CAddress, count);	//Request bytes from the selected address. 
 	while (index < count && Wire.available())
@@ -263,6 +291,7 @@ MFRC522::StatusCode MFRC522::PCD_CalculateCRC(	byte *data,		///< In: Pointer to 
  * Initializes the MFRC522 chip.
  */
 void MFRC522::PCD_Init() {
+	isUsingI2C = false;
 	// Set the chipSelectPin as digital output, do not select the slave yet
 	pinMode(_chipSelectPin, OUTPUT);
 	digitalWrite(_chipSelectPin, HIGH);
@@ -294,6 +323,7 @@ void MFRC522::PCD_Init() {
 
 void MFRC522::PCD_I2C_Init(byte address)
 {
+	isUsingI2C = true;
 	_chipI2CAddress = address;
 	Wire.begin();
 	pinMode(_resetPowerDownPin, OUTPUT);
@@ -303,8 +333,19 @@ void MFRC522::PCD_I2C_Init(byte address)
 		delay(50);
 	}
 	else { // Perform a soft reset
-		PCD_I2C_Reset();
+		PCD_Reset();
 	}
+	// When communicating with a PICC we need a timeout if something goes wrong.
+	// f_timer = 13.56 MHz / (2*TPreScaler+1) where TPreScaler = [TPrescaler_Hi:TPrescaler_Lo].
+	// TPrescaler_Hi are the four low bits in TModeReg. TPrescaler_Lo is TPrescalerReg.
+	PCD_WriteRegister(TModeReg, 0x80);			// TAuto=1; timer starts automatically at the end of the transmission in all communication modes at all speeds
+	PCD_WriteRegister(TPrescalerReg, 0xA9);		// TPreScaler = TModeReg[3..0]:TPrescalerReg, ie 0x0A9 = 169 => f_timer=40kHz, ie a timer period of 25�s.
+	PCD_WriteRegister(TReloadRegH, 0x03);		// Reload timer with 0x3E8 = 1000, ie 25ms before timeout.
+	PCD_WriteRegister(TReloadRegL, 0xE8);
+
+	PCD_WriteRegister(TxASKReg, 0x40);		// Default 0x00. Force a 100 % ASK modulation independent of the ModGsPReg register setting
+	PCD_WriteRegister(ModeReg, 0x3D);		// Default 0x3F. Set the preset value for the CRC coprocessor for the CalcCRC command to 0x6363 (ISO 14443-3 part 6.2.4)
+	PCD_AntennaOn();						// Enable the antenna driver pins TX1 and TX2 (they were disabled by the reset)
 }
 
 /**
@@ -330,18 +371,6 @@ void MFRC522::PCD_Reset() {
 	delay(50);
 	// Wait for the PowerDown bit in CommandReg to be cleared
 	while (PCD_ReadRegister(CommandReg) & (1<<4)) {
-		// PCD still restarting - unlikely after waiting 50ms, but better safe than sorry.
-	}
-} // End PCD_Reset()
-
-void MFRC522::PCD_I2C_Reset() {
-	PCD_I2C_WriteRegister(CommandReg_I2C, PCD_SoftReset);	// Issue the SoftReset command.
-	// The datasheet does not mention how long the SoftRest command takes to complete.
-	// But the MFRC522 might have been in soft power-down mode (triggered by bit 4 of CommandReg) 
-	// Section 8.8.2 in the datasheet says the oscillator start-up time is the start up time of the crystal + 37,74�s. Let us be generous: 50ms.
-	delay(50);
-	// Wait for the PowerDown bit in CommandReg to be cleared
-	while (PCD_I2C_ReadRegister(CommandReg_I2C) & (1 << 4)) {
 		// PCD still restarting - unlikely after waiting 50ms, but better safe than sorry.
 	}
 } // End PCD_Reset()
